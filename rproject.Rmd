@@ -1,0 +1,30 @@
+---
+title: "Rgroup Project"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+#Initialize
+```{r}
+album_songs <- as.data.frame(taylor::taylor_album_songs)
+all_songs <- as.data.frame(taylor::taylor_all_songs)
+albums <- as.data.frame(taylor::taylor_albums)
+```
+
+### Clean up data
+```{r cars}
+x<-"lyrics"
+y<-"key_name"
+albumsongs_raw<-album_songs
+albumsongs<-album_songs[,sapply(album_songs, is.numeric)]
+# albumsongs = subset(taylor::taylor_album_songs, select = -c(lyrics) )
+pairs(albumsongs)
+cor(albumsongs)
+summary(albumsongs)
+```
+Strong relation between Energy and loudness, energy and accustoics, energy and valence, energy and tempo
+
