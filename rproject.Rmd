@@ -1,30 +1,237 @@
 ---
 title: "Rgroup Project"
-output: pdf_document
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
-#Initialize
+## Project instructions {.tabset}
+
+
+
+### Introduction
+
+```{r include=FALSE}
+#install.packages("fmsb")
+#install.packages("PerformanceAnalytics")
+#install.packages("textdata")
+#install.packages("tidytext")
+#install.packages("ggtextures")
+#install.packages("devtools")
+#install.packages('inspectdf')
+library(fmsb)
+library(ggplot2)
+library(inspectdf)
+library(dplyr)
+library(PerformanceAnalytics)
+library(tidytext)
+library(tidyverse)
+
+```
 ```{r}
-album_songs <- as.data.frame(taylor::taylor_album_songs)
+album_songs <- taylor::taylor_album_songs
 all_songs <- as.data.frame(taylor::taylor_all_songs)
 albums <- as.data.frame(taylor::taylor_albums)
 ```
 
-### Clean up data
-```{r cars}
-x<-"lyrics"
-y<-"key_name"
-albumsongs_raw<-album_songs
-albumsongs<-album_songs[,sapply(album_songs, is.numeric)]
-# albumsongs = subset(taylor::taylor_album_songs, select = -c(lyrics) )
-pairs(albumsongs)
-cor(albumsongs)
-summary(albumsongs)
-```
-Strong relation between Energy and loudness, energy and accustoics, energy and valence, energy and tempo
+### Data Cleaning and Restructuring
 
+##### Numerical Data
+```{r}
+num<-which(sapply(album_songs, is.numeric))
+num_names<-as.vector(names(num))
+
+categorical_data<-album_songs[, -which(names(album_songs) %in% num_names)]
+lyrical_data<-album_songs[,29]
+numerical_data<-album_songs[,sapply(album_songs, is.numeric)]
+
+#Between 0 and 1
+standard_data<-as.data.frame(do.call(cbind, lapply(numerical_data, summary)))[c(1,4,6),c(2,3,7,8,9,10,11)]
+standard_data <- rbind(rep(1,5) , rep(0,5) , standard_data)
+
+other_num_data<-numerical_data[, -which(names(numerical_data) %in% names(standard_data))]
+```
+##### Categorial Data
+```{r}
+featuring<-categorical_data["featuring"] %>% drop_na(featuring)
+promotional_release<-categorical_data["promotional_release"] %>% drop_na(promotional_release)
+single_release<-categorical_data["single_release"] %>% drop_na(single_release)
+cleaned_categorical_data<-subset(categorical_data,select=-c(featuring,promotional_release,single_release))
+
+categorical_analysis <- rbind(featuring %>% inspect_cat(), promotional_release %>% inspect_cat, single_release %>% inspect_cat(), cleaned_categorical_data %>% inspect_cat())
+```
+##### Lyrical Data
+```{r}
+expanded_lrics<-data.table::rbindlist(album_songs$lyrics)
+expanded_lrics$Album<-c(NA)
+expanded_lrics$Track<-c(NA)
+bookmark<-1
+for(i in 1:nrow(album_songs)){
+  row<-album_songs[i,]
+  for (j in 1:nrow(row$lyrics[[1]]) )
+  {expanded_lrics$Album[bookmark]<-row$album_name
+  expanded_lrics$Track[bookmark]<-row$track_name
+  bookmark<-bookmark+1
+  }
+}
+tay<-expanded_lrics
+tay_tok <- tay%>%
+  unnest_tokens(word, lyric) 
+
+tidy_taylor <- tay_tok %>%
+  anti_join(stop_words)
+```
+
+
+### Analysis
+
+#### Genaral Analysis
+
+##### Numerical Data
+
+```{r, fig.width=10,fig.height=11}
+colors_border=c( rgb(0.2,0.5,0.5,0.9), rgb(0.8,0.2,0.5,0.9) , rgb(0.7,0.5,0.1,0.9) )
+colors_in=c( rgb(0.2,0.5,0.5,0.4), rgb(0.8,0.2,0.5,0.4) , rgb(0.7,0.5,0.1,0.4) )
+radarchart( standard_data  , axistype=1 , 
+    #custom polygon
+    pcol=colors_border , pfcol=colors_in , plwd=4 , plty=1,
+    #custom the grid
+    cglcol="grey", cglty=1, axislabcol="grey", caxislabels=seq(0,1,5), cglwd=0.8,
+    #custom labels
+    vlcex=0.8 
+    )
+legend(x=1.2, y=1, legend = rownames(standard_data[-c(1,2),]), bty = "n", pch=20 , col=colors_in , text.col = "grey", cex=1.2, pt.cex=3)
+
+sum_df<-do.call(cbind, lapply(numerical_data, summary))
+summary<-rbind(sum_df,numerical_data %>% summarise_if(is.numeric, sd))[c(4,7),]
+rownames(summary)<-c("Mean","SD")
+summary
+par(cex.axis=.6) 
+boxplot(standard_data)
+chart.Correlation(numerical_data, histogram = TRUE)
+
+```
+
+1. RadarPlot(Mean Values)
+    + Songs has good dancebality, energy, acousticness and valence 
+    + Speechiness, instrumentalness and liveness are on the lower side
+2. Boxplot
+    + For Dancebility,energy, acousticness and valence, the plots are tall and indicates quite variability among songs and there doesn't seem to be having any outliers
+    + Liveness and instrumentalness are on the lower side though there are outliers for both.
+    +Speechiness has long upper whisker which means that Speechiness is varied amongst the most positive quartile group
+    + Similary dancebility has long lower whisker which means dancebility is varied amongst the least positive quartile range
+3. Histogram 
+    + Dancebility and Duration seems to be normally distributed
+    + Energy and Loudness seems skewed to the left
+4. Scatterplot matrix- Correlation
+    + Energy vs Loudness - High Positive Correlation - 0.78
+    + Acousticness vs Loudness - High Negative Correlation - (-0.76)
+    + Energy vs Acousticness - High Negative Correlation - (-0.69)
+    + Energy Vs Valence - .50 Positive Correlation
+    + Other notable correlation
+      + Energy vs liveness - 0.24
+      + Loudness vs liveness - 0.28
+      + Dancebility vs Valence - 0.38
+      + Loudness vs Valence - 0.33
+      + Dancebility vs Duration_ms - (-0.28)
+      + Speechiness vs Duration_ms - (-0.32)
+      + Valence vs Duration_ms  (- 0.44)
+      + Time_signature vs Duration_ms (-0.32)
+
+##### Categorical Data
+```{r}
+categorical_analysis
+categorical_analysis %>% show_plot()
+```
+
+1. Observations
+    + Bon Iver is the most featured artist
+    + Most promotional_release was in 2010-11-08
+    + Most songs are from album Fearless
+    + Most releases were on date 2021-04-09
+    + Majority doesn't have bonus track
+    + C major, G major, D major and F Major seems dominate her songs
+    + Major seems to dominate her music
+
+##### Detailed Lyrical Data Analysis
+
+``` {r}
+tidy_taylor %>%
+  count(word, sort = TRUE) %>%
+  #filtering to get only the information we want on the plot
+  filter(n > 70,
+         word != "di",
+         word != "ooh",
+         word != "ey")%>%
+  ggplot(aes(x = reorder(word, n), y = n))+
+  geom_bar(stat="identity")+
+  geom_text(aes(label = reorder(word, n)), 
+            hjust = 1.2,vjust = 0.3, color = "white", 
+            size = 5)+
+  labs(y = "Number  of times mentioned", 
+       x = NULL,
+       title = "Most frequent words in Taylor Swift lyrics",
+       caption = "@ajaytomgeorge")+
+  coord_flip()+
+  ylim(c(0, 300))+ # I didn't want to have the bars covering the whole plotting area
+  theme_minimal()+
+  #now making more visually appealing
+  theme(plot.title = element_text( hjust = 0.5,vjust = 3, color = "blue3", size = 14,  family="Forte"),
+        axis.text.y = element_blank(),
+        axis.text.x = element_text(size = 8, color = "grey40"),
+        axis.title.x = element_text(size = 10, color = "grey40"),
+        plot.caption = element_text(size = 7.5, color = "grey40"),
+        plot.margin=unit(c(2,1,1.5,1.2),"cm"))
+
+```
+1. Word Frequency Plot
+    + Love and time seems to dominate other words by a large margin
+    + Top 5 words are positive or nuetral
+    
+#### Sentiment Analysis
+
+``` {r}
+tay_sentiment <- tidy_taylor%>%
+  inner_join(get_sentiments("bing"))%>% 
+  count(Album, Track, sentiment) %>%
+  spread(sentiment, n, fill = 0) %>%
+  mutate(sentiment = positive - negative)
+```
+
+```{r, fig.width=10,fig.height=11}
+
+tay_sentiment%>%
+  ggplot(aes(reorder(Track, sentiment), sentiment, fill = Album)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~Album, ncol = 3, scales = "free")+
+  scale_fill_manual(values = c("skyblue1", "lightgoldenrod1", "mediumorchid3", "red2", "plum1", "slategray","mediumorchid3", "red2", "plum1"))+
+  labs(x = NULL,
+       y = "Sentiment",
+       title = "Taylor Swift's songs ranked by sentiment",
+       caption = "                                                                                                                                    ajaytomgeorge")+
+  theme_minimal()+
+  theme(plot.title = element_text(size = 13, hjust = 0.4, face = "bold"),
+        axis.title.y = element_text(hjust = 0.05, size = 7, color = "grey40", angle = 0),
+        axis.title.x =  element_text(size = 8, color = "grey40"),
+        axis.text.x = element_text(size = 6.5, color = "grey40"),
+        axis.text.y = element_text(size = 6.5, color = "grey40"), 
+        strip.text = element_text(size = 9, color = "grey40", face = "bold"),
+        plot.caption = element_text(size = 7.5, color = "grey40"))+
+  coord_flip()
+
+```
+```{r, fig.width=5,fig.height=5}
+boxplot(tay_sentiment$sentiment,medcol = "red", boxlty = 0, whisklty = 1)
+```
+
+
+1. There is an overall tendency of sentiment of her songs is slighty negative with many outliers in very postive and very negative songs
+2. Evermore and Folklore seems to gave negatice sentiment songs
+
+
+
+
+ 
+### Conclusions
