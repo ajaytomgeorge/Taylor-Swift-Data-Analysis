@@ -4,7 +4,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE) 
 ```
 
 ## Project instructions {.tabset}
@@ -13,12 +13,11 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ### Introduction
 
-```{r include=FALSE}
+```{r class.source = 'fold-hide'}
 #install.packages("fmsb")
 #install.packages("PerformanceAnalytics")
 #install.packages("textdata")
 #install.packages("tidytext")
-#install.packages("ggtextures")
 #install.packages("devtools")
 #install.packages('inspectdf')
 library(fmsb)
@@ -60,7 +59,7 @@ promotional_release<-categorical_data["promotional_release"] %>% drop_na(promoti
 single_release<-categorical_data["single_release"] %>% drop_na(single_release)
 cleaned_categorical_data<-subset(categorical_data,select=-c(featuring,promotional_release,single_release))
 
-categorical_analysis <- rbind(featuring %>% inspect_cat(), promotional_release %>% inspect_cat, single_release %>% inspect_cat(), cleaned_categorical_data %>% inspect_cat())
+categorical_analysis <- rbind(featuring %>% inspect_cat(), promotional_release %>% inspect_cat, single_release %>% inspect_cat(), cleaned_categorical_data %>% select(!c(artist,album_release, key_name, track_name,lyrics)) %>% inspect_cat())
 ```
 ##### Lyrical Data
 ```{r}
@@ -186,6 +185,8 @@ tidy_taylor %>%
         plot.margin=unit(c(2,1,1.5,1.2),"cm"))
 
 ```
+
+
 1. Word Frequency Plot
     + Love and time seems to dominate other words by a large margin
     + Top 5 words are positive or nuetral
